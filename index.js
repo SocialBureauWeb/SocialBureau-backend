@@ -4,42 +4,44 @@ const cors = require("cors");
 const connectDB = require("./database/connectDB");
 const { router } = require("./routes");
 const errorHandler = require("./middlewares/errorHandler");
-
+const cookieParser = require("cookie-parser");
+const session = require("express-session");
 const app = express();
 
-// Connect to DB
-connectDB();
+connectDB()
 
-// ✅ Define allowed origins
-const allowedOrigins = [
-  "https://www.socialbureau.in",
-  "http://localhost:5173", // for local dev
-];
+const allowedOrigins = "https://www.socialbureau.in";
 
-// ✅ CORS configuration
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        return callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  })
-);
 
-// ✅ Middlewares
+
+app.use(cors({
+
+    origin: allowedOrigins, 
+
+    credentials: true, 
+
+}));
+
+
+
 app.use(express.json());
-app.use(router);
-app.use(errorHandler);
 
-// ✅ Default route (to avoid "Cannot GET /")
-app.get("/", (req, res) => {
-  res.send("Social Bureau backend is running 🚀");
-});
+app.use(cookieParser())
 
-// ✅ Export app (for Vercel)
-module.exports = app;
+app.use(
+
+    session({
+
+        secret:"secret",
+
+        resave:false,
+
+        saveUninitialized:true
+
+    })
+
+)
+
+app.use(router)
+
+app.use(errorHandler)
