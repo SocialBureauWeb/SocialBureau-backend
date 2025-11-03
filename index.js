@@ -8,10 +8,25 @@ const errorHandler = require('./middlewares/errorHandler');
 const app = express();
 
 connectDB()                     // security headers
-app.use(cors({
-  origin: 'https://www.socialbureau.in', // DO NOT use '*'
-  credentials: true, // Allow credentials
-}));                     // enable CORS
+const allowedOrigins = [
+  "https://www.socialbureau.in",
+  "http://localhost:5173", // keep this for local testing
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);                   // enable CORS
 app.use(express.json());              // logging
 
 // app.use(notFoundHandler);
