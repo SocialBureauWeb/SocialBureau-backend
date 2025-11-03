@@ -9,7 +9,7 @@ const app = express();
 
 connectDB()                     // security headers
 app.use(cors({
-  origin: 'http://localhost:5173', // DO NOT use '*'
+  origin: 'https://www.socialbureau.in', // DO NOT use '*'
   credentials: true, // Allow credentials
 }));                     // enable CORS
 app.use(express.json());              // logging
