@@ -12,7 +12,7 @@ connectDB()
 
 const allowedOrigins = [
   'https://www.socialbureau.in', // your live frontend
-  'http://localhost:5173',       // local dev
+  // 'http://localhost:5173',       // local dev
 ];
 
 app.use(
