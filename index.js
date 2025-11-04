@@ -10,13 +10,15 @@ const app = express();
 
 connectDB()
 
-const allowedOrigins = ['https://www.socialbureau.in', 'http://localhost:5173'];
+const allowedOrigins = [
+  'https://www.socialbureau.in', // your live frontend
+  'http://localhost:5173',       // local dev
+];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl)
-      if (!origin) return callback(null, true);
+      if (!origin) return callback(null, true); // allow mobile/postman
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       } else {
@@ -26,6 +28,7 @@ app.use(
     credentials: true,
   })
 );
+
 
 
 app.use(express.json());
