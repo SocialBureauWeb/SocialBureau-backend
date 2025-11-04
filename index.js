@@ -11,18 +11,18 @@ const app = express();
 connectDB()
 
 const allowedOrigins = [
-  'https://www.socialbureau.in', // your live frontend
-  // 'http://localhost:5173',       // local dev
+  "https://www.socialbureau.in",
+  "http://localhost:5173",
 ];
 
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // allow mobile/postman
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, origin || true);
       } else {
-        return callback(new Error('Not allowed by CORS'));
+        console.warn("Blocked by CORS:", origin);
+        callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
@@ -30,27 +30,18 @@ app.use(
 );
 
 
-
 app.use(express.json());
-
 app.use(cookieParser())
 
 app.use(
-
     session({
-
         secret:"secret",
-
         resave:false,
-
         saveUninitialized:true
-
     })
-
 )
 
 app.use('/', router);
-
 app.use(errorHandler)
 
 const PORT = process.env.PORT || 5000;
