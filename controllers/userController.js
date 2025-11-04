@@ -203,26 +203,24 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
     }),    
     getUsers: asyncHandler(async (req, res) => {
   try {
-  //   // Exclude users with these ClickUp IDs
-  //   const clickupIds = [
-  //     "68f61a22d488e95f18bd99f2",
-  //     "68f619eed488e95f18bd99ef",
-  //   ]; // add more if needed
+    // Exclude users with these ClickUp IDs
+    const clickupIds = [
+      "68f61a22d488e95f18bd99f2",
+      "68f619eed488e95f18bd99ef",
+    ]; // add more if needed
 
-  //   const users = await User.find(
-  //     { clickupId: { $nin: clickupIds } }, // exclude by clickupId
-  //     "name dp rating exp rate coverImage idCard tools role"
-  //   )
-  //     .populate({
-  //       path: "tools",
-  //       select: "toolName url icon description -_id", // pick the tool fields you want returned
-  //     })
-  //     .lean()
-  //     .exec();
+    const users = await User.find(
+      { clickupId: { $nin: clickupIds } }, // exclude by clickupId
+      "name dp rating exp rate coverImage idCard tools role"
+    )
+      .populate({
+        path: "tools",
+        select: "toolName url icon description -_id", // pick the tool fields you want returned
+      })
+      .lean()
+      .exec();
 
-  //   return res.send(users);
-  console.log("hi");
-  
+    return res.send(users);
   } catch (err) {
     console.error("getAllUsersSummary error:", err);
     return res

@@ -14,14 +14,17 @@ const allowedOrigins = [
   "https://www.socialbureau.in",
   "http://localhost:5173",
 ];
+console.log(allowedOrigins);
 
 app.use(
   cors({
     origin: function (origin, callback) {
       if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, origin || true);
+        console.log(origin);
+        callback(null, origin || true);        
       } else {
-        console.warn("Blocked by CORS:", origin);
+        console.log(origin);
+        console.warn("Blocked by CORS:", origin);        
         callback(new Error("Not allowed by CORS"));
       }
     },
