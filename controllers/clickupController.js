@@ -146,7 +146,7 @@ const clickupController = {
         uniqueTaskIds,
         tasks,
       };
-
+      
       return res.json({ user, clickup: clickupPayload });
     } catch (err) {
       console.error(err);

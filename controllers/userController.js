@@ -210,12 +210,12 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
     ]; // add more if needed
 
     const users = await User.find(
-      { clickupId: { $nin: clickupIds } }, // exclude by clickupId
+      { clickupId: { $nin: clickupIds } }, 
       "name dp rating exp rate coverImage idCard tools role"
     )
       .populate({
         path: "tools",
-        select: "toolName url icon description -_id", // pick the tool fields you want returned
+        select: "toolName url icon description -_id", 
       })
       .lean()
       .exec();
