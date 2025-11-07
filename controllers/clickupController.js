@@ -57,7 +57,7 @@ const clickupController = {
 
   getUserDetails: expressAsyncHandler(async (req, res) => {
     try {
-      const userName = req.query.data
+      const userName = req.query.name
       if (!userName) {
         return res.status(400).json({ message: "User name not provided" });
       }
@@ -142,9 +142,8 @@ const clickupController = {
         totalSeconds,
         totalMinutes,
         totalHours,
-        timeEntries,
         uniqueTaskIds,
-        tasks,
+        tasks:tasks.length,
       };
       
       return res.json({ user, clickup: clickupPayload });
