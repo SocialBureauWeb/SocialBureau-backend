@@ -4,6 +4,7 @@ const jwt=require("jsonwebtoken")
 const asyncHandler=require("express-async-handler")
 const User = require("../models/userModel")
 const Tool = require("../models/toolModel")
+const Client = require("../models/clientsModel")
 const userController={
     // assuming asyncHandler is already used
 register: asyncHandler(async (req, res) => {
@@ -228,6 +229,157 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
       .json({ message: "Internal server error", error: err.message });
   }
 }),
+
+updateTool: asyncHandler(async (req, res) => {
+  try {
+    const { userId, tools } = req.body;
+
+    if (!userId || !tools || !Array.isArray(tools)) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and tools[] are required",
+      });
+    }
+
+    const toolIds = [];
+
+    for (const toolData of tools) {
+      const { toolName, url, icon, description } = toolData;
+
+      if (!toolName || !url) {
+        return res.status(400).json({
+          success: false,
+          message: "toolName and url are required for each tool",
+        });
+      }
+
+      // Check if tool already exists (based on name + url)
+      let tool = await Tool.findOne({ toolName, url });
+
+      if (!tool) {
+        tool = await Tool.create({
+          toolName,
+          url,
+          icon: icon || "",
+          description: description || "",
+        });
+      }
+
+      toolIds.push(tool._id);
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { tools: toolIds }, // replace current tools
+      { new: true }
+    ).populate("tools");
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Tools saved & assigned successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error("Error updating tools", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+}),
+
+updateClient: asyncHandler(async (req, res) => {
+  try {
+    const { userId, clients } = req.body;
+
+    if (!userId || !Array.isArray(clients)) {
+      return res.status(400).json({
+        success: false,
+        message: "userId and clients[] are required",
+      });
+    }
+
+    const clientIds = [];
+
+    for (const clientData of clients) {
+      const { name, companyName, email, phone, website, logo, status, notes } = clientData || {};
+      if (!name) {
+        return res.status(400).json({
+          success: false,
+          message: "Client name is required for each client",
+        });
+      }
+
+      // identify existing client by email OR website OR name (in that order)
+      const idQuery = {
+        $or: [
+          email ? { email } : null,
+          website ? { website } : null,
+          { name }
+        ].filter(Boolean)
+      };
+
+      // upsert to avoid duplicates in Client collection and to update provided fields
+      const client = await Client.findOneAndUpdate(
+        idQuery,
+        {
+          $set: {
+            name,
+            companyName: companyName ?? "",
+            email: email ?? "",
+            phone: phone ?? "",
+            website: website ?? "",
+            logo: logo ?? "",
+            notes: notes ?? "",
+            status: status ?? "active",
+          }
+        },
+        { new: true, upsert: true }
+      );
+
+      clientIds.push(client._id);
+    }
+
+    // dedupe incoming IDs before adding
+    const uniqueIds = [...new Set(clientIds.map(String))];
+
+    // append without duplicating existing entries
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { $addToSet: { clients: { $each: uniqueIds } } },
+      { new: true }
+    ).populate("clients");
+
+    if (!updatedUser) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Clients added (skipping duplicates) and assigned successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    console.error("Error updating clients", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+}),
+
+
+
 }
 module.exports=userController
 function escapeRegExp(string) {

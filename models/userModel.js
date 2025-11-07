@@ -28,6 +28,13 @@ const userSchema = new mongoose.Schema(
       },
     ],
 
+    clients: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Client",
+      },
+    ],
+
     // ClickUp ID (optional). Indexed for fast lookup; make unique if your app requires one-to-one mapping.
     clickupId: {
       type: String,

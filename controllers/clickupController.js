@@ -63,13 +63,25 @@ const clickupController = {
       }
       const includeSensitive =
         String(req.query.includeSensitive).toLowerCase() === "true";
-      const query = User.findOne({ name: userName }, // exclude by clickupId
-            "name dp clickupId rating exp rate coverImage idCard tools role"
-          )
-            .populate({
-              path: "tools",
-              select: "toolName url icon description -_id", // pick the tool fields you want returned
-            })
+      const query = User.findOne(
+        { name: userName },
+        "name dp clickupId rating doj rate coverImage idCard tools role email clients"
+      )
+      .populate([
+        {
+          path: "tools",
+          select: "toolName url icon description -_id"
+        },
+        {
+          path: "clients",
+          select: "name website logo -_id"
+        },
+        {
+          path: "reviews",
+          select: "name review rating -_id"
+        }
+      ]);
+
       if (includeSensitive) {
         query = query.select("+password");
       }

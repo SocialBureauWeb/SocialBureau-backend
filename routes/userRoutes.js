@@ -7,4 +7,6 @@ userRouter.post('/register',upload.fields([{ name: 'coverImage', maxCount: 1 },{
 userRouter.get('/login',userController.login)
 userRouter.get('/logout',userController.logout)
 userRouter.get('/team',userController.getUsers)
+userRouter.put('/tools',userController.updateTool)
+userRouter.put('/clients',userController.updateClient)
 module.exports=userRouter
