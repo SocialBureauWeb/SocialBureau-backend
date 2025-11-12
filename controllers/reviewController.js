@@ -292,6 +292,19 @@ getGoogleReviews: expressAsyncHandler(async (req, res) => {
     }
 
     // return the reviews (if any) and some place metadata
+    // Google Place Details returns review objects which often include
+    // `profile_photo_url` for the reviewer. Normalize reviews and
+    // provide a safe fallback for the frontend.
+    const normalizedReviews = (data.result?.reviews || []).map((r) => ({
+      author_name: r.author_name,
+      author_url: r.author_url,
+      profile_photo_url: r.profile_photo_url || null, // may be absent for some reviews
+      rating: r.rating,
+      relative_time_description: r.relative_time_description,
+      text: r.text,
+      time: r.time,
+    }));
+
     const result = {
       place: {
         name: data.result?.name,
@@ -299,10 +312,8 @@ getGoogleReviews: expressAsyncHandler(async (req, res) => {
         phone: data.result?.formatted_phone_number,
         website: data.result?.website,
       },
-      reviews: data.result?.reviews || [],
+      reviews: normalizedReviews,
     };
-    console.log(result,placeId,apiKey);
-
     return res.json({ success: true, data: result });
   } catch (err) {
     console.error('getGoogleReviews error', err?.response?.data || err.message || err);
