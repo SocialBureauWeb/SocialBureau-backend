@@ -264,6 +264,51 @@ getEmployeeRatingSummary:expressAsyncHandler(async (req, res) => {
     return sendError(res, 500, 'Internal server error', err.message);
   }
 })
+
+,
+/*
+ * Fetch Google Place Details (reviews) and return reviews array.
+ * Query params: placeId (optional - falls back to env GOOGLE_PLACE_ID)
+ */
+getGoogleReviews: expressAsyncHandler(async (req, res) => {
+  try {
+    const placeId = req.query.placeId || process.env.GOOGLE_PLACE_ID;
+    const apiKey = process.env.GOOGLE_API_KEY;
+
+    if (!apiKey) return sendError(res, 500, 'Google API key not configured on server');
+    if (!placeId) return sendError(res, 400, 'placeId is required (query param or GOOGLE_PLACE_ID env)');
+
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(
+      placeId
+    )}&fields=name,rating,reviews,formatted_phone_number,website`;
+
+    const resp = await axios.get(url, { params: { key: apiKey } });
+    const data = resp.data;
+
+    if (!data) return sendError(res, 502, 'No response from Google Places API');
+    if (data.status && data.status !== 'OK') {
+      const message = data.error_message || data.status;
+      return sendError(res, 502, `Google Places API error: ${message}`);
+    }
+
+    // return the reviews (if any) and some place metadata
+    const result = {
+      place: {
+        name: data.result?.name,
+        rating: data.result?.rating,
+        phone: data.result?.formatted_phone_number,
+        website: data.result?.website,
+      },
+      reviews: data.result?.reviews || [],
+    };
+    console.log(result,placeId,apiKey);
+
+    return res.json({ success: true, data: result });
+  } catch (err) {
+    console.error('getGoogleReviews error', err?.response?.data || err.message || err);
+    return sendError(res, 500, 'Failed to fetch Google reviews', err.message || err);
+  }
+})
 }
 
 module.exports=reviewController
