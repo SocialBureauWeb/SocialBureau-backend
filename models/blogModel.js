@@ -26,13 +26,53 @@ const blogSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    content: {
-      // array of strings, as in your sample
+    customUrl: {
+      // custom URL path for the blog (alternative to slug)
+      type: String,
+      trim: true,
+      lowercase: true,
+      sparse: true, // allows null/undefined but must be unique if provided
+      index: true,
+    },
+    keywords: {
+      // SEO keywords for the blog
       type: [String],
+      default: [],
+    },
+    childBlogs: {
+      // references to related/child blog posts
+      type: [mongoose.Schema.Types.ObjectId],
+      ref: "Blog",
+      default: [],
+    },
+    content: {
+      // array of content sections with text and optional images
+      type: [
+        {
+          type: {
+            type: String,
+            enum: ["text", "image", "mixed"],
+            default: "text",
+          },
+          text: {
+            type: String, // rich text HTML content
+            trim: true,
+          },
+          image: {
+            type: String, // image URL/path for this section
+            trim: true,
+          },
+          heading: {
+            type: String,
+            enum: ["h1", "h2", "h3", "h4", "h5", "h6", "none"],
+            default: "none",
+          },
+        },
+      ],
       default: [],
       validate: {
         validator: (arr) => Array.isArray(arr) && arr.length > 0,
-        message: "content must be a non-empty array of strings",
+        message: "content must be a non-empty array of content sections",
       },
     },
     authorName: {
@@ -73,6 +113,18 @@ const blogSchema = new mongoose.Schema(
       views: { type: Number, default: 0 },
       likes: { type: Number, default: 0 },
       shares: { type: Number, default: 0 },
+    },
+    seo: {
+      title: {
+        type: String,
+        trim: true,
+        maxlength: 60,
+      },
+      description: {
+        type: String,
+        trim: true,
+        maxlength: 160,
+      },
     },
   },
   {

@@ -14,7 +14,6 @@ const allowedOrigins = [
   "https://www.socialbureau.in",
   "http://localhost:5173",
 ];
-console.log(allowedOrigins);
 
 app.use(
   cors({

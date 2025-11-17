@@ -12,23 +12,23 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
   let toolsInput = req.body.tools; // expected: array of strings or array of { toolName, url, icon, description }
   const coverFile = req.files?.coverImage?.[0];
   const idCardFile = req.files?.idCard?.[0];
-  const dpFile = req.files?.dp?.[0];
+  // const dpFile = req.files?.dp?.[0];
 
   const getUrlFromFile = (f) =>
     f?.path || f?.secure_url || f?.url || f?.location || f?.publicUrl || null;
 
   const coverImageUrl = getUrlFromFile(coverFile);
   const idCardUrl = getUrlFromFile(idCardFile);
-  const dpUrl = getUrlFromFile(dpFile);
+  // const dpUrl = getUrlFromFile(dpFile);
 
   if (!clickupId || !email || !name || !password || !role || !emp_id || !doj) {
     res.status(400);
     throw new Error('clickupId, email, name and password are required');
   }
 
-  if (!coverImageUrl || !idCardUrl || !dpUrl) {
+  if (!coverImageUrl || !idCardUrl) {
     res.status(400);
-    throw new Error('coverImage, dp and idCard files are required');
+    throw new Error('coverImage and idCard files are required');
   }
 
   const userExists = await User.findOne({ clickupId });
@@ -143,7 +143,6 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
     password: hashed_password,
     coverImage: coverImageUrl,
     idCard: idCardUrl,
-    dp: dpUrl,
     exp,
     tools: toolIds, // set references to Tool ids
   });
@@ -212,7 +211,7 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
 
     const users = await User.find(
       { clickupId: { $nin: clickupIds } }, 
-      "name dp rating exp rate coverImage idCard tools role"
+      "name rating exp rate coverImage idCard tools role"
     )
       .populate({
         path: "tools",
