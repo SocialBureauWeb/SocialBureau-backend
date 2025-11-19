@@ -78,7 +78,8 @@ const clickupController = {
         },
         {
           path: "reviews",
-          select: "name review rating -_id"
+          select: "name company review rating createdAt -_id",
+          match: { approved: true }
         }
       ]);
 
