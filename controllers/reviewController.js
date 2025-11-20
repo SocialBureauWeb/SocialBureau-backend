@@ -284,7 +284,6 @@ getGoogleReviews: expressAsyncHandler(async (req, res) => {
 
     const resp = await axios.get(url, { params: { key: apiKey } });
     const data = resp.data;
-console.log(resp,data);
     if (!data) return sendError(res, 502, 'No response from Google Places API');
     if (data.status && data.status !== 'OK') {
       const message = data.error_message || data.status;

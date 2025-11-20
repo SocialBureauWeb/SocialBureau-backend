@@ -345,7 +345,7 @@ const eventController = {
       event.registrations.push({ name: name || '', email: emailLower });
       await event.save();
 
-      return res.json({ success: true, message: 'Successfully registered (guest). You will receive confirmation if contact provided.' });
+      return res.json({ success: true, message: 'Thank you. You have successfully registered for the event' });
     } catch (err) {
       console.error('registerForEvent error', err);
       return sendError(res, 500, 'Internal server error', err.message);
