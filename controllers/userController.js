@@ -21,7 +21,7 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
   const idCardUrl = getUrlFromFile(idCardFile);
   // const dpUrl = getUrlFromFile(dpFile);
 
-  if (!clickupId || !email || !name || !password || !role || !emp_id || !doj) {
+  if (!clickupId || !email || !name || !password || !role || !doj) {
     res.status(400);
     throw new Error('clickupId, email, name and password are required');
   }
