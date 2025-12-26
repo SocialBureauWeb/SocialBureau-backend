@@ -5,68 +5,78 @@ const asyncHandler=require("express-async-handler")
 const User = require("../models/userModel")
 const Tool = require("../models/toolModel")
 const Client = require("../models/clientsModel")
+// helper to get upload URL from multer/cloudinary file object
+function getUrlFromFile(f) {
+  return f?.path || f?.secure_url || f?.url || f?.location || f?.publicUrl || null;
+}
 const userController={
-    // assuming asyncHandler is already used
 register: asyncHandler(async (req, res) => {
-const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
-  let toolsInput = req.body.tools; // expected: array of strings or array of { toolName, url, icon, description }
+  const { clickupId, email, name, password, role, emp_id, doj, rate, phone, isEmployee } = req.body;
+  console.log("🔍 Register attempt with email:", email);
+  
+  if (email) {
+    const emailExists = await User.findOne({
+      email: email.toLowerCase().trim(),
+    });
+    
+    console.log("✅ Email check result:", emailExists);
+
+    if (emailExists) {
+      res.status(400);
+      throw new Error("Email already exists");
+    }
+  }
+
+  // ✅ FIX: Only check clickupId if it's provided (not undefined)
+  if (clickupId) {
+    const userExists = await User.findOne({ clickupId });
+    if (userExists) {
+      res.status(400);
+      throw new Error('User already exists');
+    }
+  }
+
+  // ✅ FIX: Parse tools from JSON string
+  let toolsInput = req.body.tools;
+  console.log("Raw tools from req.body:", toolsInput, typeof toolsInput);
+
+  // If it's a JSON string, parse it
+  if (typeof toolsInput === 'string') {
+    try {
+      toolsInput = JSON.parse(toolsInput);
+      console.log("Parsed tools:", toolsInput);
+    } catch (err) {
+      console.error("Failed to parse tools JSON:", err.message);
+      toolsInput = [];
+    }
+  }
+
+  // Ensure it's an array
+  if (!Array.isArray(toolsInput)) {
+    toolsInput = toolsInput ? [toolsInput] : [];
+  }
+
+  console.log("Final toolsInput after parsing:", toolsInput);
+
   const coverFile = req.files?.coverImage?.[0];
   const idCardFile = req.files?.idCard?.[0];
-  // const dpFile = req.files?.dp?.[0];
-
-  const getUrlFromFile = (f) =>
-    f?.path || f?.secure_url || f?.url || f?.location || f?.publicUrl || null;
 
   const coverImageUrl = getUrlFromFile(coverFile);
   const idCardUrl = getUrlFromFile(idCardFile);
-  // const dpUrl = getUrlFromFile(dpFile);
 
-  if (!clickupId || !email || !name || !password || !role || !doj) {
-    res.status(400);
-    throw new Error('clickupId, email, name and password are required');
-  }
-
-  if (!coverImageUrl || !idCardUrl) {
-    res.status(400);
-    throw new Error('coverImage and idCard files are required');
-  }
-
-  const userExists = await User.findOne({ clickupId });
-  if (userExists) {
-    res.status(400);
-    throw new Error('User already exists');
-  }
-
-  // Normalize toolsInput into an array
-  if (!toolsInput) {
-    toolsInput = [];
-  } else if (typeof toolsInput === 'string') {
-    // If client sent JSON serialized array as string, try to parse it; otherwise treat as single tool name
-    try {
-      const parsed = JSON.parse(toolsInput);
-      toolsInput = Array.isArray(parsed) ? parsed : [parsed];
-    } catch (err) {
-      // not JSON - treat as single tool name string
-      toolsInput = [toolsInput];
-    }
-  } else if (!Array.isArray(toolsInput)) {
-    toolsInput = [toolsInput];
-  }
-
-  // helper to extract toolName and other optional props
+  // ✅ Normalize tools helper
   const normalizeTool = (t) => {
-    if (!t) return null;
-    if (typeof t === 'string') {
-      return { toolName: t.trim() };
-    }
-    // object expected to have toolName (or name)
-    const toolName = (t.toolName || t.name || '').trim();
+    if (!t || typeof t !== "object") return null;
+
+    const toolName = typeof t.toolName === "string" ? t.toolName.trim() : "";
+
     if (!toolName) return null;
+
     return {
       toolName,
-      url: t.url || t.link || t.url || undefined,
+      url: t.url ? t.url.trim() : undefined,
       icon: t.icon || undefined,
-      description: t.description || undefined,
+      description: t.description ? t.description.trim() : undefined,
     };
   };
 
@@ -74,6 +84,8 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
   const normalized = toolsInput
     .map(normalizeTool)
     .filter(Boolean);
+
+  console.log("Normalized tools:", normalized);
 
   // Deduplicate incoming toolNames (case-insensitive)
   const seen = new Set();
@@ -86,32 +98,62 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
     }
   }
 
-  // Process tools: find existing or create new ones
+  console.log("Deduped tools:", dedupedTools);
+
+  // ✅ Map uploaded toolIcons files to tools by array order
+  const toolFiles = req.files?.toolIcons || [];
+  console.log("Uploaded tool icon files count:", toolFiles.length);
+
+  for (let i = 0; i < dedupedTools.length; i++) {
+    const t = dedupedTools[i];
+    if (!t.icon && toolFiles[i]) {
+      const iconUrl = getUrlFromFile(toolFiles[i]);
+      if (iconUrl) {
+        t.icon = iconUrl;
+        console.log(`Mapped uploaded icon for tool ${i} (${t.toolName}):`, iconUrl);
+      }
+    }
+  }
+
   const toolIds = await Promise.all(
     dedupedTools.map(async (t) => {
-      // Case-insensitive search for existing tool
-      const existing = await Tool.findOne({ toolName: { $regex: `^${escapeRegExp(t.toolName)}$`, $options: 'i' } });
-      if (existing) return existing._id;
+      const existing = await Tool.findOne({
+        toolName: { $regex: `^${escapeRegExp(t.toolName)}$`, $options: 'i' }
+      });
 
-      // Not found -> create new tool
+      if (existing) {
+        console.log(`Tool "${t.toolName}" already exists. Updating if needed...`);
+        let changed = false;
+        if (t.url && existing.url !== t.url) { existing.url = t.url; changed = true; }
+        if (t.icon && existing.icon !== t.icon) { existing.icon = t.icon; changed = true; console.log(`  - Updated icon to: ${t.icon}`); }
+        if (t.description && existing.description !== t.description) { existing.description = t.description; changed = true; }
+        if (changed) await existing.save();
+        return existing._id;
+      }
+
       try {
+        console.log(`Creating new tool: ${t.toolName}`, { url: t.url, icon: t.icon, description: t.description });
         const created = await Tool.create({
           toolName: t.toolName,
           url: t.url,
           icon: t.icon,
           description: t.description,
         });
+        console.log(`Created tool ${t.toolName} with ID: ${created._id}, icon: ${created.icon}`);
         return created._id;
       } catch (err) {
-        // If there's a duplicate key error because of concurrent creates, try to find again
         if (err.code === 11000) {
-          const retry = await Tool.findOne({ toolName: { $regex: `^${escapeRegExp(t.toolName)}$`, $options: 'i' } });
+          const retry = await Tool.findOne({
+            toolName: { $regex: `^${escapeRegExp(t.toolName)}$`, $options: 'i' }
+          });
           if (retry) return retry._id;
         }
         throw err;
       }
     })
   );
+
+  console.log("Final toolIds to save:", toolIds);
 
   const hashed_password = await bcrypt.hash(password, 10);
   const now = new Date();
@@ -137,6 +179,7 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
     email,
     rate,
     role,
+    isEmployee,
     name,
     emp_id,
     doj,
@@ -144,13 +187,15 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
     coverImage: coverImageUrl,
     idCard: idCardUrl,
     exp,
-    tools: toolIds, // set references to Tool ids
+    tools: toolIds,
   });
 
   if (!userCreated) {
     res.status(500);
     throw new Error('User creation failed');
   }
+
+  console.log("User created with tools:", userCreated);
 
   const payload = {
     email: userCreated.email,
@@ -174,43 +219,144 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
     user: { id: userCreated._id || userCreated.id, email: userCreated.email, name: userCreated.name },
   });
 }),
-    login:asyncHandler(async(req,res)=>{
-        const {clickupId,password}=req.body
-        const userExist=await User.findOne({clickupId})
-        if(!userExist){
-            throw new Error("User not found")
-        }
-        const passwordMatch= bcrypt.compare(userExist.password,password)
-        if(!passwordMatch){
-            throw new Error("Passwords not matching")
-        }
-        const payload={
-            clickupId:userExist.clickupId,
-            id:userExist.id
-        }
-        const token=jwt.sign(payload,process.env.JWT_SECRET_KEY)
-        res.cookie("token",token,{
-            maxAge:2*24*60*60*1000,
-            sameSite:"none",
-            http:true,
-            secure:false
-        })
-        res.send("Login successful")
-    }),
+// login: asyncHandler(async (req, res) => {
+//   const { email, clickupId, password } = req.body;
+
+//   // 🔹 allow login via email OR clickupId
+//   const userExist = await User.findOne({
+//     $or: [
+//       email ? { email: email.toLowerCase().trim() } : null,
+//       clickupId ? { clickupId } : null,
+//     ].filter(Boolean),
+//   });
+
+//   if (!userExist) {
+//     res.status(400);
+//     throw new Error("User not found");
+//   }
+
+//   const passwordMatch = await bcrypt.compare(password, userExist.password);
+//   if (!passwordMatch) {
+//     res.status(400);
+//     throw new Error("Invalid credentials");
+//   }
+
+//   const payload = {
+//     id: userExist._id,
+//     email: userExist.email,
+//     clickupId: userExist.clickupId,
+//   };
+
+//   const token = jwt.sign(payload, process.env.JWT_SECRET_KEY, {
+//     expiresIn: "2d",
+//   });
+
+//   res.cookie("token", token, {
+//     maxAge: 2 * 24 * 60 * 60 * 1000,
+//     httpOnly: true,
+//     sameSite: "lax",
+//     secure: process.env.NODE_ENV === "production",
+//   });
+
+// }),
+// 
+
+login: asyncHandler(async (req, res) => {
+  const { email, clickupId, password } = req.body;
+
+  const userExist = await User.findOne({
+    $or: [
+      email ? { email: email.toLowerCase().trim() } : null,
+      clickupId ? { clickupId } : null,
+    ].filter(Boolean),
+  });
+
+  if (!userExist) {
+    res.status(400);
+    throw new Error("User not found");
+  }
+
+  const passwordMatch = await bcrypt.compare(password, userExist.password);
+  if (!passwordMatch) {
+    res.status(400);
+    throw new Error("Invalid credentials");
+  }
+
+  // 🔐 ROLE & VERIFICATION CHECK - Fixed logic
+  const isEmployee = userExist.role === "employee";
+  const isVerified = userExist.verification === true; // Boolean comparison only
+
+  const payload = {
+    id: userExist._id,
+    email: userExist.email,
+    role: userExist.role,
+    verification: userExist.verification,
+  };
+
+  const token = jwt.sign(payload, process.env.JWT_SECRET_KEY, {
+    expiresIn: "1d",
+  });
+
+  res.cookie("token", token, {
+    maxAge: 2 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  // ✅ SEND FLAGS TO FRONTEND
+  res.json({
+    message: "Login successful",
+    token,
+    user: {
+      id: userExist._id,
+      email: userExist.email,
+      role: userExist.role,
+      verification: userExist.verification,
+      isEmployee,
+      isVerified,
+    },
+  });
+}),
+
+
     logout:asyncHandler(async(req,res)=>{
         res.clearCookie("token")
         res.send("User logged out")
     }),    
-    getUsers: asyncHandler(async (req, res) => {
-  try {
-    // Exclude users with these ClickUp IDs
-    const clickupIds = [
-      "68f61a22d488e95f18bd99f2",
-      "68f619eed488e95f18bd99ef",
-    ]; // add more if needed
 
+//   getUsers: asyncHandler(async (req, res) => {
+//   try {
+//     // Exclude users with these ClickUp IDs
+//     const clickupIds = [
+//       "68f61a22d488e95f18bd99f2",
+//       "68f619eed488e95f18bd99ef",
+//     ]; // add more if needed
+
+// const users = await User.find(
+//       { clickupId: { $nin: clickupIds } }, 
+//       "name rating exp rate coverImage idCard tools role"
+//     )
+//       .populate({
+//         path: "tools",
+//         select: "toolName url icon description -_id", 
+//       })
+//       .lean()
+//       .exec();
+
+//     return res.send(users);
+//   } catch (err) {
+//     console.error("getAllUsersSummary error:", err);
+//     return res
+//       .status(500)
+//       .json({ message: "Internal server error", error: err.message });
+//   }
+// }),
+
+getUsers: asyncHandler(async (req, res) => {
+  try {
     const users = await User.find(
-      { clickupId: { $nin: clickupIds } }, 
+      {}, 
       "name rating exp rate coverImage idCard tools role"
     )
       .populate({
@@ -222,7 +368,7 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
 
     return res.send(users);
   } catch (err) {
-    console.error("getAllUsersSummary error:", err);
+    console.error("getUsers error:", err);
     return res
       .status(500)
       .json({ message: "Internal server error", error: err.message });
@@ -231,37 +377,66 @@ const { clickupId, email, name, password, role, emp_id, doj, rate } = req.body;
 
 updateTool: asyncHandler(async (req, res) => {
   try {
-    const { userId, tools } = req.body;
+    const { userId } = req.body;
 
-    if (!userId || !tools || !Array.isArray(tools)) {
+    // tools may be sent as JSON string (from form-data) or as an array
+    let toolsInput = req.body.tools;
+    if (typeof toolsInput === 'string') {
+      try {
+        toolsInput = JSON.parse(toolsInput);
+      } catch (err) {
+        // fallback: keep as string -> wrap into array so validation below catches it
+        toolsInput = toolsInput ? [toolsInput] : [];
+      }
+    }
+
+    if (!userId || !toolsInput || !Array.isArray(toolsInput)) {
       return res.status(400).json({
         success: false,
         message: "userId and tools[] are required",
       });
     }
 
+    // files uploaded via multer on this route (if any)
+    const toolFiles = req.files?.toolIcons || [];
+
     const toolIds = [];
 
-    for (const toolData of tools) {
-      const { toolName, url, icon, description } = toolData;
+    for (let i = 0; i < toolsInput.length; i++) {
+      const toolData = toolsInput[i] || {};
+      const { toolName } = toolData;
+      // url, icon, description optional in payload; icon can come from uploaded file
+      const url = toolData.url || "";
+      const description = toolData.description || "";
 
-      if (!toolName || !url) {
+      // map uploaded files by order -> icon from payload takes precedence
+      const uploadedFile = toolFiles[i];
+      const iconUrl = toolData.icon || getUrlFromFile(uploadedFile) || "";
+
+      if (!toolName) {
         return res.status(400).json({
           success: false,
-          message: "toolName and url are required for each tool",
+          message: "toolName is required for each tool",
         });
       }
 
-      // Check if tool already exists (based on name + url)
-      let tool = await Tool.findOne({ toolName, url });
+      // Case-insensitive search for an existing tool (match by name + url if provided)
+      const query = { toolName: { $regex: `^${escapeRegExp(toolName)}$`, $options: 'i' } };
+      if (url) query.url = url;
+
+      let tool = await Tool.findOne(query);
 
       if (!tool) {
         tool = await Tool.create({
           toolName,
           url,
-          icon: icon || "",
-          description: description || "",
+          icon: iconUrl,
+          description,
         });
+      } else if (iconUrl && (!tool.icon || tool.icon !== iconUrl)) {
+        // update icon if a new uploaded icon was provided
+        tool.icon = iconUrl;
+        await tool.save();
       }
 
       toolIds.push(tool._id);

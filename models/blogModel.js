@@ -3,7 +3,6 @@ const mongoose = require("mongoose");
 const blogSchema = new mongoose.Schema(
   {
     user: {
-      // optional: reference to a User in your system (keep if you track owner)
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: false,
@@ -75,6 +74,37 @@ const blogSchema = new mongoose.Schema(
         message: "content must be a non-empty array of content sections",
       },
     },
+// meta: {
+//   views: { type: Number, default: 0 },
+//   likes: { type: Number, default: 0 },
+//   shares: { type: Number, default: 0 },
+// },
+comments: [
+        {
+        _id: {
+          type: mongoose.Schema.Types.ObjectId,
+          default: () => new mongoose.Types.ObjectId(),
+        },
+        text: {
+          type: String,
+          required: true,
+        },
+        author: {
+          type: String,
+          required: true,
+        },
+        userId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+        },
+        userEmail: String,
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+],
+
     authorName: {
       type: String,
       trim: true,
@@ -114,6 +144,12 @@ const blogSchema = new mongoose.Schema(
       likes: { type: Number, default: 0 },
       shares: { type: Number, default: 0 },
     },
+    likedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     seo: {
       title: {
         type: String,
@@ -126,6 +162,7 @@ const blogSchema = new mongoose.Schema(
         maxlength: 160,
       },
     },
+    
   },
   {
     timestamps: true,

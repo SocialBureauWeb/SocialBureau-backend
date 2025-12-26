@@ -20,6 +20,13 @@ const userSchema = new mongoose.Schema(
         require:true,
         minLength:[5,"Minimum 5 characters required"]
     },
+    verification:{
+      type:Boolean,
+      default:false,
+    },
+    phone:{
+          type:Number,
+    },
     // Allow multiple tools (e.g., Word, ClickUp, etc.)
     tools: [
       {
@@ -27,6 +34,11 @@ const userSchema = new mongoose.Schema(
         ref: "Tool",
       },
     ],
+    isEmployee:
+      {
+        type:Boolean,
+        default:false,
+      },
 
     clients: [
       {
@@ -37,8 +49,7 @@ const userSchema = new mongoose.Schema(
 
     // ClickUp ID (optional). Indexed for fast lookup; make unique if your app requires one-to-one mapping.
     clickupId: {
-      type: String,
-      trim: true,
+      type: Number,
       index: true,
     },
 
@@ -61,7 +72,7 @@ const userSchema = new mongoose.Schema(
       type: String 
     },
     role: { 
-      type: String 
+    type: String,
     },
     rating: { 
       type: Number 

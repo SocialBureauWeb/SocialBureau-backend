@@ -6,6 +6,7 @@ const { router } = require("./routes");
 const errorHandler = require("./middlewares/errorHandler");
 const cookieParser = require("cookie-parser");
 const session = require("express-session");
+const blogRoutes = require("./routes/blogRoutes");
 const app = express();
 
 connectDB()
@@ -42,6 +43,8 @@ app.use(
 )
 
 app.use('/', router);
+app.use('/blog', blogRoutes);
+// app.use("/api/newsletter", require("./routes/newsletterRoutes"));
 app.use(errorHandler)
 
 const PORT = process.env.PORT || 5000;

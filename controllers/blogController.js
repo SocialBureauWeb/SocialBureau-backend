@@ -190,7 +190,6 @@ const blogController = {
   getBlogBySlug: expressAsyncHandler(async (req, res) => {
     try {
       const { slug } = req.params;
-
       const blog = await Blog.findOne({ slug })
         .populate('childBlogs', 'title slug excerpt image category')
         .lean();
@@ -217,7 +216,6 @@ const blogController = {
         .sort('-createdAt')
         .limit(l)
         .lean();
-
       return res.json({ success: true, data: blogs });
     } catch (err) {
       console.error('getLatestBlogs error', err);
@@ -313,6 +311,402 @@ const blogController = {
       return sendError(res, 500, 'Internal server error', err.message);
     }
   }),
+
+
+
+  //   likeBlog: expressAsyncHandler(async (req, res) => {
+  //   try {
+  //     const { slug } = req.params;
+  //     const { isLiked } = req.body;
+
+  //     const blog = await Blog.findOne({ slug });
+  //     if (!blog) return sendError(res, 404, 'Blog not found');
+
+  //     if (isLiked) {
+  //       blog.meta.likes = (blog.meta.likes || 0) + 1;
+  //     } else {
+  //       blog.meta.likes = Math.max(0, (blog.meta.likes || 0) - 1);
+  //     }
+
+  //     await blog.save();
+  //     return res.json({ success: true, likes: blog.meta.likes, isLiked });
+  //   } catch (err) {
+  //     console.error('likeBlog error', err);
+  //     return sendError(res, 500, 'Internal server error', err.message);
+  //   }
+  // }),
+
+  // // Add a comment to a blog
+  // addComment: expressAsyncHandler(async (req, res) => {
+  //   try {
+  //     const { slug } = req.params;
+  //     const { text, author } = req.body;
+
+  //     if (!text || !text.trim()) {
+  //       return sendError(res, 400, 'Comment text is required');
+  //     }
+
+  //     const blog = await Blog.findOne({ slug });
+  //     if (!blog) return sendError(res, 404, 'Blog not found');
+
+  //     const newComment = {
+  //       _id: new mongoose.Types.ObjectId(),
+  //       text: text.trim(),
+  //       author: author || 'Anonymous',
+  //       createdAt: new Date(),
+  //     };
+
+  //     blog.comments.push(newComment);
+  //     await blog.save();
+
+  //     return res.status(201).json({
+  //       success: true,
+  //       comment: newComment,
+  //       totalComments: blog.comments.length,
+  //     });
+  //   } catch (err) {
+  //     console.error('addComment error', err);
+  //     return sendError(res, 500, 'Internal server error', err.message);
+  //   }
+  // }),
+
+  // // Delete a comment
+  // deleteComment: expressAsyncHandler(async (req, res) => {
+  //   try {
+  //     const { slug, commentId } = req.params;
+
+  //     const blog = await Blog.findOne({ slug });
+  //     if (!blog) return sendError(res, 404, 'Blog not found');
+
+  //     const commentIndex = blog.comments.findIndex(
+  //       (c) => c._id.toString() === commentId
+  //     );
+
+  //     if (commentIndex === -1) {
+  //       return sendError(res, 404, 'Comment not found');
+  //     }
+
+  //     blog.comments.splice(commentIndex, 1);
+  //     await blog.save();
+
+  //     return res.json({
+  //       success: true,
+  //       message: 'Comment deleted successfully',
+  //       totalComments: blog.comments.length,
+  //     });
+  //   } catch (err) {
+  //     console.error('deleteComment error', err);
+  //     return sendError(res, 500, 'Internal server error', err.message);
+  //   }
+  // }),
+  // // Get comments for a blog
+  // getComments: expressAsyncHandler(async (req, res) => {
+  //   try {
+  //     const { slug } = req.params;
+
+  //     const blog = await Blog.findOne({ slug }).select('comments');
+  //     if (!blog) return sendError(res, 404, 'Blog not found');
+
+  //     return res.json({
+  //       success: true,
+  //       comments: blog.comments,
+  //       totalComments: blog.comments.length,
+  //     });
+  //   } catch (err) {
+  //     console.error('getComments error', err);
+  //     return sendError(res, 500, 'Internal server error', err.message);
+  //   }
+  // }),
+
+
+  //   likeBlog: expressAsyncHandler(async (req, res) => {
+  //   try {
+  //     const { slug } = req.params;
+  //     const userId = req.user?.id; // Get from auth middleware
+
+  //     if (!userId) {
+  //       return sendError(res, 401, 'User must be logged in to like');
+  //     }
+
+  //     const blog = await Blog.findOne({ slug });
+  //     if (!blog) return sendError(res, 404, 'Blog not found');
+
+  //     // Check if user already liked
+  //     const alreadyLiked = blog.likedBy.some(id => id.toString() === userId.toString());
+
+  //     if (alreadyLiked) {
+  //       // Unlike: Remove user from likedBy
+  //       blog.likedBy = blog.likedBy.filter(id => id.toString() !== userId.toString());
+  //     } else {
+  //       // Like: Add user to likedBy
+  //       blog.likedBy.push(userId);
+  //     }
+
+  //     await blog.save();
+
+  //     return res.json({
+  //       success: true,
+  //       likes: blog.likedBy.length, // Total unique likes
+  //       isLiked: !alreadyLiked, // Current user's status
+  //       likedBy: blog.likedBy,
+  //     });
+  //   } catch (err) {
+  //     console.error('likeBlog error', err);
+  //     return sendError(res, 500, 'Internal server error', err.message);
+  //   }
+  // }),
+
+  // // ✅ FIXED: Add Comment - With user tracking
+  // addComment: expressAsyncHandler(async (req, res) => {
+  //   try {
+  //     const { slug } = req.params;
+  //     const { text } = req.body;
+  //     const userId = req.user?.id; // Get from auth middleware
+  //     const userEmail = req.user?.email;
+  //     const userName = req.user?.name || req.user?.email || "User";
+
+  //     if (!text || !text.trim()) {
+  //       return sendError(res, 400, 'Comment text is required');
+  //     }
+
+  //     if (!userId) {
+  //       return sendError(res, 401, 'User must be logged in to comment');
+  //     }
+
+  //     const blog = await Blog.findOne({ slug });
+  //     if (!blog) return sendError(res, 404, 'Blog not found');
+
+  //     const newComment = {
+  //       _id: new mongoose.Types.ObjectId(),
+  //       text: text.trim(),
+  //       author: userName, // ✅ Use actual username
+  //       userId: userId,
+  //       userEmail: userEmail,
+  //       createdAt: new Date(),
+  //     };
+
+  //     blog.comments.push(newComment);
+  //     await blog.save();
+
+  //     return res.status(201).json({
+  //       success: true,
+  //       comment: newComment,
+  //       totalComments: blog.comments.length,
+  //     });
+  //   } catch (err) {
+  //     console.error('addComment error', err);
+  //     return sendError(res, 500, 'Internal server error', err.message);
+  //   }
+  // }),
+
+  // // ✅ FIXED: Delete Comment - Only own comments
+  // deleteComment: expressAsyncHandler(async (req, res) => {
+  //   try {
+  //     const { slug, commentId } = req.params;
+  //     const userId = req.user?.id; // Get from auth middleware
+
+  //     if (!userId) {
+  //       return sendError(res, 401, 'User must be logged in to delete comments');
+  //     }
+
+  //     const blog = await Blog.findOne({ slug });
+  //     if (!blog) return sendError(res, 404, 'Blog not found');
+
+  //     const comment = blog.comments.id(commentId);
+  //     if (!comment) return sendError(res, 404, 'Comment not found');
+
+  //     // ✅ Only allow user to delete their own comment
+  //     if (comment.userId.toString() !== userId.toString()) {
+  //       return sendError(res, 403, 'You can only delete your own comments');
+  //     }
+
+  //     blog.comments.id(commentId).deleteOne();
+  //     await blog.save();
+
+  //     return res.json({
+  //       success: true,
+  //       message: 'Comment deleted successfully',
+  //       totalComments: blog.comments.length,
+  //     });
+  //   } catch (err) {
+  //     console.error('deleteComment error', err);
+  //     return sendError(res, 500, 'Internal server error', err.message);
+  //   }
+  // }),
+
+  // // Get Comments
+  // getComments: expressAsyncHandler(async (req, res) => {
+  //   try {
+  //     const { slug } = req.params;
+
+  //     const blog = await Blog.findOne({ slug }).select('comments');
+  //     if (!blog) return sendError(res, 404, 'Blog not found');
+
+  //     return res.json({
+  //       success: true,
+  //       comments: blog.comments,
+  //       totalComments: blog.comments.length,
+  //     });
+  //   } catch (err) {
+  //     console.error('getComments error', err);
+  //     return sendError(res, 500, 'Internal server error', err.message);
+  //   }
+  // }),
+
+
+
+likeBlog: expressAsyncHandler(async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const userId = req.user?.id; // From auth middleware
+    console.log("slug",slug);
+    
+    if (!userId) {
+      return sendError(res, 401, 'User must be logged in to like');
+    }
+
+    const blog = await Blog.findOne({ slug });
+    if (!blog) return sendError(res, 404, 'Blog not found');
+
+    // Check if user already liked
+    const userIdStr = userId.toString();
+    const alreadyLiked = blog.likedBy.some(id => id.toString() === userIdStr);
+    
+    if (alreadyLiked) {
+      // Unlike: Remove user from likedBy
+      blog.likedBy = blog.likedBy.filter(id => id.toString() !== userIdStr);
+      console.log(`User ${userId} unliked blog ${slug}`);
+    } else {
+      // Like: Add user to likedBy
+      blog.likedBy.push(userId);
+      console.log(`User ${userId} liked blog ${slug}`);
+    }
+
+    await blog.save();
+
+    // ✅ Return total likes count and current user's like status
+    res.json({
+      success: true,
+      likes: blog.likedBy.length, // Total unique likes
+      isLiked: !alreadyLiked, // Current user's new status
+      likedBy: blog.likedBy, // Full array for frontend validation
+      message: alreadyLiked ? 'Post unliked' : 'Post liked',
+    });
+  } catch (err) {
+    console.error('likeBlog error:', err);
+    return sendError(res, 500, 'Internal server error', err.message);
+  }
+}),
+
+// ✅ ADD COMMENT - With user tracking
+addComment: expressAsyncHandler(async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const { text } = req.body;
+    const userId = req.user?.id; // From auth middleware
+    const userEmail = req.user?.email;
+
+    if (!text || !text.trim()) {
+      return sendError(res, 400, 'Comment text is required');
+    }
+
+    if (!userId) {
+      return sendError(res, 401, 'User must be logged in to comment');
+    }
+
+    const blog = await Blog.findOne({ slug });
+    if (!blog) return sendError(res, 404, 'Blog not found');
+
+    // Get user name from another collection or use email
+    const userName = req.user?.name || userEmail || "User";
+
+    const newComment = {
+      _id: new mongoose.Types.ObjectId(),
+      text: text.trim(),
+      author: userName, // ✅ Use actual username
+      userId: userId,
+      userEmail: userEmail,
+      createdAt: new Date(),
+    };
+
+    blog.comments.push(newComment);
+    await blog.save();
+
+    console.log(`Comment added by ${userId} on blog ${slug}`);
+
+    res.status(201).json({
+      success: true,
+      comment: newComment,
+      totalComments: blog.comments.length,
+      message: 'Comment added successfully',
+    });
+  } catch (err) {
+    console.error('addComment error:', err);
+    return sendError(res, 500, 'Internal server error', err.message);
+  }
+}),
+
+// ✅ DELETE COMMENT - Only own comments
+deleteComment: expressAsyncHandler(async (req, res) => {
+  try {
+    const { slug, commentId } = req.params;
+    const userId = req.user?.id; // From auth middleware
+
+    if (!userId) {
+      return sendError(res, 401, 'User must be logged in to delete comments');
+    }
+
+    const blog = await Blog.findOne({ slug });
+    if (!blog) return sendError(res, 404, 'Blog not found');
+
+    const comment = blog.comments.id(commentId);
+    if (!comment) return sendError(res, 404, 'Comment not found');
+
+    // ✅ Only allow user to delete their own comment
+    const commentUserIdStr = comment.userId?.toString();
+    const userIdStr = userId.toString();
+
+    if (commentUserIdStr !== userIdStr) {
+      return sendError(res, 403, 'You can only delete your own comments');
+    }
+
+    blog.comments.id(commentId).deleteOne();
+    await blog.save();
+
+    console.log(`Comment ${commentId} deleted by user ${userId}`);
+
+    res.json({
+      success: true,
+      message: 'Comment deleted successfully',
+      totalComments: blog.comments.length,
+    });
+  } catch (err) {
+    console.error('deleteComment error:', err);
+    return sendError(res, 500, 'Internal server error', err.message);
+  }
+}),
+
+// ✅ GET COMMENTS - Public
+getComments: expressAsyncHandler(async (req, res) => {
+  try {
+    const { slug } = req.params;
+
+    const blog = await Blog.findOne({ slug }).select('comments');
+    if (!blog) return sendError(res, 404, 'Blog not found');
+
+    res.json({
+      success: true,
+      comments: blog.comments,
+      totalComments: blog.comments.length,
+    });
+  } catch (err) {
+    console.error('getComments error:', err);
+    return sendError(res, 500, 'Internal server error', err.message);
+  }
+}),
 };
 
+
+
 module.exports = blogController;
+
