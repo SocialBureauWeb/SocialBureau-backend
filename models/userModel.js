@@ -88,7 +88,29 @@ const userSchema = new mongoose.Schema(
     },
     doj:{
       type:Date
-    }    
+    },
+    
+    // === Engagement & Leaderboard (SAFE ADDITION) ===
+    points: {
+      type: Number,
+      default: 0,
+    },
+
+    engagement: {
+      likes: {
+        type: Number,
+        default: 0,
+      },
+      comments: {
+        type: Number,
+        default: 0,
+      },
+      shares: {
+        type: Number,
+        default: 0,
+      },
+},
+    
   },
   {
     timestamps: true,

@@ -9,7 +9,13 @@ const session = require("express-session");
 const blogRoutes = require("./routes/blogRoutes");
 const app = express();
 
-connectDB()
+connectDB().then(() => {
+  // start cron jobs (newsletter, etc.) AFTER DB is connected
+  require("./cron/newsletterCron");
+  // console.log("✅ Cron jobs initialized after DB connection");
+}).catch(err => {
+  console.error("❌ Failed to start cron jobs:", err);
+});
 
 const allowedOrigins = [
   "https://www.socialbureau.in",
@@ -45,6 +51,7 @@ app.use(
 app.use('/', router);
 app.use('/blog', blogRoutes);
 // app.use("/api/newsletter", require("./routes/newsletterRoutes"));
+ app.use("/api/jobs", require("./routes/jobRoutes"));
 app.use(errorHandler)
 
 const PORT = process.env.PORT || 5000;

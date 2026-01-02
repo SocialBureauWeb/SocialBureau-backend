@@ -13,5 +13,7 @@ userRouter.get('/logout',userController.logout)
 userRouter.get('/team',userController.getUsers)
 userRouter.put('/tools',userController.updateTool)
 userRouter.put('/clients',userController.updateClient)
+userRouter.get("/leaderboard", userController.getLeaderboard);
+
 module.exports=userRouter
 
