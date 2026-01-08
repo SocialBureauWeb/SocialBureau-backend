@@ -14,6 +14,7 @@ userRouter.get('/team',userController.getUsers)
 userRouter.put('/tools',userController.updateTool)
 userRouter.put('/clients',userController.updateClient)
 userRouter.get("/leaderboard", userController.getLeaderboard);
-
+userRouter.post("/forgot-password", userController.forgotPassword);
+userRouter.post("/reset-password/:token", userController.resetPassword);
 module.exports=userRouter
 

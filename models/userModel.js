@@ -20,6 +20,12 @@ const userSchema = new mongoose.Schema(
         require:true,
         minLength:[5,"Minimum 5 characters required"]
     },
+    resetPasswordToken:{
+      type: String,
+    },
+    resetPasswordExpires: {
+      type: Date,
+    },
     verification:{
       type:Boolean,
       default:false,
