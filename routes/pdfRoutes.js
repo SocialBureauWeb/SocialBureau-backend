@@ -301,4 +301,117 @@ router.post("/from-word", upload.single("file"), async (req, res, next) => {
   }
 });
 
+// ─── EDIT PDF ─────────────────────────────────────────────────────────────
+router.post("/edit", upload.single("file"), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "file required" });
+    const text = req.body.text || "";
+    const x = Number(req.body.x) || 50;
+    const y = Number(req.body.y) || 50;
+    const pageNum = Math.max(1, Number(req.body.page) || 1);
+    const fontSize = Number(req.body.fontSize) || 12;
+    const colorName = req.body.color || "black";
+
+    const src = await PDFDocument.load(req.file.buffer);
+    const pageCount = src.getPageCount();
+    if (pageNum > pageCount) {
+      return res.status(400).json({ message: `Page number ${pageNum} exceeds PDF page count of ${pageCount}` });
+    }
+
+    const pages = src.getPages();
+    const page = pages[pageNum - 1];
+
+    const font = await src.embedFont(StandardFonts.Helvetica);
+    
+    // Determine color
+    let color = rgb(0, 0, 0);
+    if (colorName === "blue") color = rgb(0, 0, 1);
+    else if (colorName === "red") color = rgb(1, 0, 0);
+    else if (colorName === "green") color = rgb(0, 0.5, 0);
+    else if (colorName.startsWith("#")) {
+      const hex = colorName.replace("#", "");
+      const r = (parseInt(hex.substring(0, 2), 16) || 0) / 255;
+      const g = (parseInt(hex.substring(2, 4), 16) || 0) / 255;
+      const b = (parseInt(hex.substring(4, 6), 16) || 0) / 255;
+      color = rgb(r, g, b);
+    }
+
+    page.drawText(sanitizeWinAnsi(text), {
+      x,
+      y,
+      size: fontSize,
+      font,
+      color,
+    });
+
+    const bytes = await src.save();
+    sendBuffer(res, Buffer.from(bytes), "edited.pdf", "application/pdf");
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── SIGN PDF ─────────────────────────────────────────────────────────────
+router.post("/sign", upload.single("file"), async (req, res, next) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: "file required" });
+    const signatureType = req.body.signatureType || "text";
+    const signatureData = req.body.signatureData || "";
+    const x = Number(req.body.x) || 50;
+    const y = Number(req.body.y) || 50;
+    const pageNum = Math.max(1, Number(req.body.page) || 1);
+    
+    const src = await PDFDocument.load(req.file.buffer);
+    const pageCount = src.getPageCount();
+    if (pageNum > pageCount) {
+      return res.status(400).json({ message: `Page number ${pageNum} exceeds PDF page count of ${pageCount}` });
+    }
+
+    const pages = src.getPages();
+    const page = pages[pageNum - 1];
+
+    if (signatureType === "text") {
+      const font = await src.embedFont(StandardFonts.HelveticaBoldOblique);
+      const fontSize = Number(req.body.fontSize) || 20;
+      const color = rgb(0.05, 0.05, 0.4); // Elegant signature blue
+      page.drawText(sanitizeWinAnsi(signatureData), {
+        x,
+        y,
+        size: fontSize,
+        font,
+        color,
+      });
+    } else {
+      if (!signatureData) {
+        return res.status(400).json({ message: "Signature image data is required" });
+      }
+      
+      const cleanBase64 = signatureData.replace(/^data:image\/\w+;base64,/, "");
+      const imgBuffer = Buffer.from(cleanBase64, "base64");
+      
+      let img;
+      if (signatureData.includes("image/jpeg") || signatureData.includes("image/jpg")) {
+        img = await src.embedJpg(imgBuffer);
+      } else {
+        img = await src.embedPng(imgBuffer);
+      }
+      
+      const width = Number(req.body.width) || 120;
+      const height = Number(req.body.height) || (img.height * (width / img.width)) || 40;
+      
+      page.drawImage(img, {
+        x,
+        y,
+        width,
+        height,
+      });
+    }
+
+    const bytes = await src.save();
+    sendBuffer(res, Buffer.from(bytes), "signed.pdf", "application/pdf");
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
