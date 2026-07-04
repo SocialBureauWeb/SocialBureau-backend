@@ -11,7 +11,6 @@ const path = require("path");
 
 const app = express();
 
-// ================== ALLOWED ORIGINS ==================
 const allowedOrigins = [
   "https://www.socialbureau.in",
   "https://socialbureau.in",
