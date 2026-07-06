@@ -13,6 +13,74 @@ function loadPdfToImg() {
   return pdfToImgPromise;
 }
 
+const fs = require("fs");
+const path = require("path");
+const { exec } = require("child_process");
+const promisify = require("util").promisify;
+const execPromise = promisify(exec);
+const fsPromises = fs.promises;
+
+// Find LibreOffice binary path
+function getLibreOfficePath() {
+  if (process.platform === "win32") {
+    const paths = [
+      "C:\\Program Files\\LibreOffice\\program\\soffice.exe",
+      "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe"
+    ];
+    for (const p of paths) {
+      if (fs.existsSync(p)) return `"${p}"`;
+    }
+    return "soffice"; // Fallback to system PATH
+  }
+  return "soffice"; // On Linux/macOS, it's usually in PATH
+}
+
+async function convertWithLibreOffice(fileBuffer, inputExt, outputExt, inFilter = null) {
+  const soffice = getLibreOfficePath();
+  const tempDir = path.join(__dirname, "..", "temp");
+  
+  // Ensure temp directory exists
+  if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  const rand = Math.random().toString(36).substring(7);
+  const inputFileName = `temp_${rand}.${inputExt}`;
+  const inputFilePath = path.join(tempDir, inputFileName);
+  
+  // Write input buffer to temp file
+  await fsPromises.writeFile(inputFilePath, fileBuffer);
+
+  try {
+    // Execute headless LibreOffice conversion
+    const filterArg = inFilter ? `--infilter="${inFilter}"` : "";
+    const cmd = `${soffice} --headless ${filterArg} --convert-to ${outputExt} --outdir "${tempDir}" "${inputFilePath}"`;
+    
+    await execPromise(cmd);
+
+    const outputFileName = `temp_${rand}.${outputExt}`;
+    const outputFilePath = path.join(tempDir, outputFileName);
+
+    if (!fs.existsSync(outputFilePath)) {
+      throw new Error("Conversion failed. Output file was not created by LibreOffice.");
+    }
+
+    const outputBuffer = await fsPromises.readFile(outputFilePath);
+
+    // Clean up temp files in background
+    fsPromises.unlink(inputFilePath).catch(() => {});
+    fsPromises.unlink(outputFilePath).catch(() => {});
+
+    return outputBuffer;
+  } catch (err) {
+    // Clean up input file in case of error
+    fsPromises.unlink(inputFilePath).catch(() => {});
+    throw new Error(
+      `LibreOffice conversion failed. Please make sure LibreOffice is installed. Error: ${err.message}`
+    );
+  }
+}
+
 const { upload, parsePageRanges, sendBuffer } = require("../utils/multerUtils");
 
 const router = express.Router();
@@ -147,40 +215,21 @@ router.post("/from-images", upload.array("files"), async (req, res, next) => {
 router.post("/to-word", upload.single("file"), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ message: "file required" });
-    const { text = "" } = await pdfParse(req.file.buffer);
-
-    const paragraphs = text
-      .split(/\n+/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map(
-        (line) =>
-          new Paragraph({
-            children: [new TextRun({ text: line })],
-          })
+    
+    try {
+      const buffer = await convertWithLibreOffice(req.file.buffer, "pdf", "docx", "writer_pdf_import");
+      sendBuffer(
+        res,
+        buffer,
+        "converted.docx",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
       );
-
-    const doc = new Document({
-      sections: [
-        {
-          children: [
-            new Paragraph({
-              text: "Converted from PDF",
-              heading: HeadingLevel.HEADING_1,
-            }),
-            ...paragraphs,
-          ],
-        },
-      ],
-    });
-
-    const buffer = await Packer.toBuffer(doc);
-    sendBuffer(
-      res,
-      buffer,
-      "converted.docx",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    );
+    } catch (err) {
+      console.error("LibreOffice conversion failed, falling back to basic text extractor:", err);
+      return res.status(500).json({ 
+        message: "High-fidelity conversion requires LibreOffice. Please download and install LibreOffice (100% Free) from https://www.libreoffice.org/ on the server/machine and add it to your system PATH." 
+      });
+    }
   } catch (err) {
     next(err);
   }
@@ -226,76 +275,15 @@ router.post("/from-word", upload.single("file"), async (req, res, next) => {
   try {
     if (!req.file) return res.status(400).json({ message: "file required" });
     
-    // Extract raw text from docx and sanitize for WinAnsi encoding
-    const parsed = await mammoth.extractRawText({ buffer: req.file.buffer });
-    const text = sanitizeWinAnsi(parsed.value || "");
- 
-    const pdfDoc = await PDFDocument.create();
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontSize = 10;
-    const margin = 50;
-    
-    const lines = text.split(/\r?\n/);
-    let page = pdfDoc.addPage();
-    let { width, height } = page.getSize();
-    let y = height - margin;
- 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        y -= 15;
-        if (y < margin) {
-          page = pdfDoc.addPage();
-          y = height - margin;
-        }
-        continue;
-      }
- 
-      // Simple word-wrapping to prevent text overflow past page width
-      const maxWidth = width - (margin * 2);
-      const words = trimmed.split(/\s+/);
-      let currentLine = "";
- 
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const testWidth = font.widthOfTextAtSize(testLine, fontSize);
-        if (testWidth > maxWidth && currentLine) {
-          page.drawText(currentLine, {
-            x: margin,
-            y: y,
-            size: fontSize,
-            font,
-            color: rgb(0.1, 0.1, 0.1)
-          });
-          y -= 15;
-          if (y < margin) {
-            page = pdfDoc.addPage();
-            y = height - margin;
-          }
-          currentLine = word;
-        } else {
-          currentLine = testLine;
-        }
-      }
- 
-      if (currentLine) {
-        page.drawText(currentLine, {
-          x: margin,
-          y: y,
-          size: fontSize,
-          font,
-          color: rgb(0.1, 0.1, 0.1)
-        });
-        y -= 15;
-        if (y < margin) {
-          page = pdfDoc.addPage();
-          y = height - margin;
-        }
-      }
+    try {
+      const buffer = await convertWithLibreOffice(req.file.buffer, "docx", "pdf");
+      sendBuffer(res, buffer, "converted.pdf", "application/pdf");
+    } catch (err) {
+      console.error("LibreOffice conversion failed:", err);
+      return res.status(500).json({ 
+        message: "High-fidelity conversion requires LibreOffice. Please download and install LibreOffice (100% Free) from https://www.libreoffice.org/ on the server/machine and add it to your system PATH." 
+      });
     }
- 
-    const bytes = await pdfDoc.save();
-    sendBuffer(res, Buffer.from(bytes), "converted.pdf", "application/pdf");
   } catch (err) {
     next(err);
   }
