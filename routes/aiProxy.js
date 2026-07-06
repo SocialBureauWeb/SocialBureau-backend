@@ -227,4 +227,97 @@ router.post("/prompt", async (req, res, next) => {
   }
 });
 
+// ── POST /api/ai/content-generator ──────────────────────────────────────────────
+router.post("/content-generator", async (req, res, next) => {
+  try {
+    const {
+      type, // 'blog-title', 'meta-desc', 'caption', 'hashtag'
+      topic,
+      tone = "professional",
+      keywords = "",
+      platform = "generic", // for caption
+    } = req.body || {};
+
+    if (!topic || !topic.trim()) {
+      return res.status(400).json({ message: "topic is required" });
+    }
+
+    let systemPrompt = "You are a professional content creator and digital marketer.";
+    let userText = "";
+
+    if (type === "blog-title") {
+      systemPrompt = "You are an expert copywriter and content strategist specializing in high-click-through blog headlines and titles.";
+      userText = 
+        `Write 10 highly engaging, SEO-optimized, and creative blog post titles/headlines about: "${topic}".\n` +
+        `Tone to match: ${tone}\n` +
+        `Keywords to target: ${keywords || "none"}\n\n` +
+        `Provide a mix of styles (e.g. how-to, lists, question titles, ultimate guide, and intrigue). Number them 1 to 10.`;
+    } else if (type === "meta-desc") {
+      systemPrompt = "You are a search engine optimization expert specializing in writing compelling meta descriptions that maximize click-through rate (CTR).";
+      userText = 
+        `Generate 5 distinct SEO meta descriptions for a webpage about: "${topic}".\n` +
+        `Target Keywords: ${keywords || "none"}\n` +
+        `Tone: ${tone}\n\n` +
+        `Each description MUST be strictly between 120 and 160 characters. Provide the character count for each.`;
+    } else if (type === "caption") {
+      systemPrompt = "You are a social media copywriter and brand manager who writes highly engaging captions for platforms like LinkedIn, Twitter/X, and Instagram.";
+      userText = 
+        `Write a social media caption about: "${topic}".\n` +
+        `Platform: ${platform}\n` +
+        `Tone: ${tone}\n` +
+        `Keywords to weave in: ${keywords || "none"}\n\n` +
+        `Deliver:\n` +
+        `- 1 primary caption\n` +
+        `- 2 shorter variations\n` +
+        `- 5-10 relevant hashtags to append at the end.\n` +
+        `Ensure appropriate spacing, formatting, and emojis based on the platform.`;
+    } else if (type === "hashtag") {
+      systemPrompt = "You are an online social media marketing strategist who generates viral, relevant, and trend-analyzed hashtags.";
+      userText = 
+        `Generate 30 relevant, high-performance hashtags for: "${topic}".\n` +
+        `Keywords/Niche tags to include: ${keywords || "none"}\n\n` +
+        `Categorize them into:\n` +
+        `1. High volume (Broad / Popular)\n` +
+        `2. Medium volume (Niche / Specific)\n` +
+        `3. Low volume (Long-tail / Brand focus)\n\n` +
+        `Format them clearly with hash prefixes.`;
+    } else {
+      return res.status(400).json({ message: "Invalid type parameter" });
+    }
+
+    const anthropicKey = process.env.ANTHROPIC_API_KEY;
+    if (anthropicKey) {
+      const client = new Anthropic({ apiKey: anthropicKey });
+      const message = await client.messages.create({
+        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929",
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userText }],
+      });
+      const output = (message.content || [])
+        .filter((b) => b.type === "text")
+        .map((b) => b.text)
+        .join("")
+        .trim();
+      return res.json({ output });
+    } else {
+      if (!GEMINI_KEY) {
+        return res.status(500).json({ message: "GEMINI_API_KEY not configured" });
+      }
+      const genAI = new GoogleGenerativeAI(GEMINI_KEY);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await model.generateContent({
+        contents: [
+          { role: "user", parts: [{ text: systemPrompt + "\n\n" + userText }] }
+        ]
+      });
+      const output = result.response.text().trim();
+      return res.json({ output });
+    }
+  } catch (err) {
+    console.error("[aiProxy] Content generation error:", err);
+    res.status(502).json({ message: `Content generation failed: ${err.message}` });
+  }
+});
+
 module.exports = router;
