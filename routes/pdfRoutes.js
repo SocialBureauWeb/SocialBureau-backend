@@ -226,9 +226,33 @@ router.post("/to-word", upload.single("file"), async (req, res, next) => {
       );
     } catch (err) {
       console.error("LibreOffice conversion failed, falling back to basic text extractor:", err);
-      return res.status(500).json({ 
-        message: "High-fidelity conversion requires LibreOffice. Please download and install LibreOffice (100% Free) from https://www.libreoffice.org/ on the server/machine and add it to your system PATH." 
-      });
+      try {
+        const data = await pdfParse(req.file.buffer);
+        const lines = data.text.split("\n");
+        const paragraphs = lines.map(line => {
+          return new Paragraph({
+            children: [new TextRun({ text: line, size: 22 })],
+          });
+        });
+        const doc = new Document({
+          sections: [{
+            properties: {},
+            children: paragraphs
+          }]
+        });
+        const docxBuffer = await Packer.toBuffer(doc);
+        sendBuffer(
+          res,
+          docxBuffer,
+          "converted.docx",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        );
+      } catch (fallbackErr) {
+        console.error("Fallback PDF to Word conversion failed:", fallbackErr);
+        return res.status(500).json({ 
+          message: "Conversion failed. High-fidelity conversion requires LibreOffice to be installed on the server/machine." 
+        });
+      }
     }
   } catch (err) {
     next(err);
@@ -279,10 +303,48 @@ router.post("/from-word", upload.single("file"), async (req, res, next) => {
       const buffer = await convertWithLibreOffice(req.file.buffer, "docx", "pdf");
       sendBuffer(res, buffer, "converted.pdf", "application/pdf");
     } catch (err) {
-      console.error("LibreOffice conversion failed:", err);
-      return res.status(500).json({ 
-        message: "High-fidelity conversion requires LibreOffice. Please download and install LibreOffice (100% Free) from https://www.libreoffice.org/ on the server/machine and add it to your system PATH." 
-      });
+      console.error("LibreOffice conversion failed, falling back to basic PDF generator:", err);
+      try {
+        const data = await mammoth.extractRawText({ buffer: req.file.buffer });
+        const text = data.value || "";
+        const lines = text.split("\n");
+        
+        const pdfDoc = await PDFDocument.create();
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        
+        let page = pdfDoc.addPage([595.28, 841.89]); // A4
+        const { width, height } = page.getSize();
+        let y = height - 50;
+        const margin = 50;
+        const fontSize = 10;
+        const lineHeight = 14;
+        
+        for (const line of lines) {
+          if (y < margin + 20) {
+            page = pdfDoc.addPage([595.28, 841.89]);
+            y = height - 50;
+          }
+          const cleanLine = sanitizeWinAnsi(line.trim());
+          if (cleanLine) {
+            page.drawText(cleanLine, {
+              x: margin,
+              y: y,
+              size: fontSize,
+              font: font,
+              color: rgb(0, 0, 0)
+            });
+          }
+          y -= lineHeight;
+        }
+        
+        const pdfBytes = await pdfDoc.save();
+        sendBuffer(res, Buffer.from(pdfBytes), "converted.pdf", "application/pdf");
+      } catch (fallbackErr) {
+        console.error("Fallback Word to PDF conversion failed:", fallbackErr);
+        return res.status(500).json({ 
+          message: "Conversion failed. High-fidelity conversion requires LibreOffice to be installed on the server/machine." 
+        });
+      }
     }
   } catch (err) {
     next(err);
