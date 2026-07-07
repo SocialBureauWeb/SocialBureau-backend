@@ -211,7 +211,7 @@ router.post("/prompt", async (req, res, next) => {
       }
 
       const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
       const result = await model.generateContent({
         contents: [
           { role: "user", parts: [{ text: systemPrompt + "\n\n" + userText }] }
@@ -223,6 +223,16 @@ router.post("/prompt", async (req, res, next) => {
     }
   } catch (err) {
     console.error("[aiProxy] Prompt generation error:", err);
+    // Detect quota / rate-limit errors from Gemini and return 429 instead of 502
+    const msg = err.message || "";
+    if (err.status === 429 || msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate")) {
+      const retryMatch = msg.match(/(\d+\.?\d*)\s*s/);
+      const retryAfter = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 60;
+      return res.status(429).json({
+        message: `AI quota exceeded. Please wait ${retryAfter} seconds and try again.`,
+        retryAfter
+      });
+    }
     res.status(502).json({ message: `Prompt generation failed: ${err.message}` });
   }
 });
@@ -305,7 +315,7 @@ router.post("/content-generator", async (req, res, next) => {
         return res.status(500).json({ message: "GEMINI_API_KEY not configured" });
       }
       const genAI = new GoogleGenerativeAI(GEMINI_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-8b" });
       const result = await model.generateContent({
         contents: [
           { role: "user", parts: [{ text: systemPrompt + "\n\n" + userText }] }
@@ -316,6 +326,16 @@ router.post("/content-generator", async (req, res, next) => {
     }
   } catch (err) {
     console.error("[aiProxy] Content generation error:", err);
+    // Detect quota / rate-limit errors from Gemini and return 429 instead of 502
+    const msg = err.message || "";
+    if (err.status === 429 || msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("rate")) {
+      const retryMatch = msg.match(/(\d+\.?\d*)\s*s/);
+      const retryAfter = retryMatch ? Math.ceil(parseFloat(retryMatch[1])) : 60;
+      return res.status(429).json({
+        message: `AI quota exceeded. Please wait ${retryAfter} seconds and try again.`,
+        retryAfter
+      });
+    }
     res.status(502).json({ message: `Content generation failed: ${err.message}` });
   }
 });
