@@ -36,6 +36,7 @@ const fifaRoutes = require("./fifaRoutes");
 const aiProxy = require("./aiProxy");
 const pdfRoutes = require("./pdfRoutes");
 const imageRoutes = require("./imageRoutes");
+const billingRoutes = require("./billingRoutes");
 
 const auditReportRoutes = require("../modules/auditReports/auditReportRoutes");
 
@@ -82,6 +83,7 @@ router.use("/api/ai", aiProxy);
 router.use("/api/pdf", pdfRoutes);
 router.use("/api/image", imageRoutes);
 router.use("/api/audit-reports", auditReportRoutes);
+router.use("/api/billing", billingRoutes);
 router.use("/", intakeRoutes);
 
 module.exports = router;

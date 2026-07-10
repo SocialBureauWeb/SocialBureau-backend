@@ -512,11 +512,12 @@ const userController = {
       expiresIn: "1d",
     });
 
+    const isProd = process.env.NODE_ENV === "production";
     res.cookie("token", token, {
       maxAge: 2 * 24 * 60 * 60 * 1000,
       httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      sameSite: isProd ? "none" : "lax",
+      secure: isProd,
     });
 
     // 📧 Send login thank you email asynchronously (non-blocking)
@@ -665,11 +666,12 @@ const userController = {
       expiresIn: "1d",
     });
 
+    const isProd = process.env.NODE_ENV === "production";
     res.cookie("token", token, {
       maxAge: 2 * 24 * 60 * 60 * 1000,
       httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      sameSite: isProd ? "none" : "lax",
+      secure: isProd,
     });
 
     // 📧 Send login thank you email for returning users (non-blocking)

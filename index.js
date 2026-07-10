@@ -128,6 +128,8 @@ const startServer = async () => {
     require("./cron/newsletterCron");
     require("./cron/meetingCron");
     require("./cron/fifaCron");
+    const { initializeBillingCrons } = require("./cron/billingCron");
+    initializeBillingCrons();
 
     app.listen(PORT, () => {
       console.log(`\n${"=".repeat(50)}`);
