@@ -1,34 +1,26 @@
+const express = require("express");
+const router = express.Router();
+const subscriptionController = require("../controllers/subscriptionController");
+const userAuthentication = require("../middlewares/userAuthentication");
+const isAdmin = require("../middlewares/isAdmin");
 
-// const express = require('express');
-// const subscriptionRouter = express.Router();
-// const subscriptionController = require('../controllers/subscriptionController');
-// const userAuthentication = require('../middlewares/userAuthentication');
+// ─── Public ──────────────────────────────────────────────────────────────
+router.get(
+  "/portfolio/:slug/visible",
+  subscriptionController.getPortfolioVisibility
+);
+router.post("/checkout", subscriptionController.initCheckout);
+router.post("/verify", subscriptionController.verifySubscriptionPayment);
 
-// // Get all plans
-// subscriptionRouter.get('/plans', subscriptionController.getPlans);
+// ─── Admin ───────────────────────────────────────────────────────────────
+router.get(
+  "/:slug/status",
+  userAuthentication,
+  isAdmin,
+  subscriptionController.getStatus
+);
 
-// // Create subscription (protected)
-// subscriptionRouter.post('/create', userAuthentication, subscriptionController.createSubscription);
+// ─── Webhook (Razorpay) — no auth, signature verified in controller ──────
+router.post("/webhook", subscriptionController.handleWebhook);
 
-// // Verify payment (protected)
-// subscriptionRouter.post('/verify',userAuthentication, subscriptionController.verifyPayment);
-
-// // Get user's current subscription (protected)
-// subscriptionRouter.get('/current', userAuthentication, subscriptionController.getUserSubscription);
-
-// // Get subscription history (protected)
-// subscriptionRouter.get('/history',userAuthentication, subscriptionController.getSubscriptionHistory);
-
-// // Pause subscription (protected)
-// subscriptionRouter.post('/pause', userAuthentication, subscriptionController.pauseSubscription);
-
-// // Resume subscription (protected)
-// subscriptionRouter.post('/resume', userAuthentication, subscriptionController.resumeSubscription);
-
-// // Cancel subscription (protected)
-// subscriptionRouter.post('/cancel',userAuthentication, subscriptionController.cancelSubscription);
-
-// // Webhook (no auth needed - but signature verified)
-// subscriptionRouter.post('/webhook', subscriptionController.handleWebhook);
-
-// module.exports = subscriptionRouter;
+module.exports = router;

@@ -74,7 +74,16 @@ app.use(
 
 
 
-app.use(express.json());
+// The verify callback captures the raw request body so the Razorpay webhook
+// handler can validate its HMAC signature (signatures are computed over the
+// exact raw bytes, not the re-serialized parsed object).
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(cookieParser());
 
 app.use((req, res, next) => {

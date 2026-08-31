@@ -83,8 +83,27 @@ const userController = {
     const { clickupId, clickupListId, clickupChatViewId, clickupToken, email, name, password, role, emp_id, doj, rate, phone, isEmployee, captchaToken } = req.body;
     console.log(" Register attempt with email:", email);
 
-    // Verify Cloudflare Turnstile Captcha
-    if (process.env.CAPTCHA_SECRET_KEY) {
+    // Skip captcha for authenticated admin users (e.g. admin creating clients from dashboard)
+    let isAdminRequest = false;
+    try {
+      const tokenFromCookie = req.cookies && req.cookies.token;
+      const authHeader = req.headers && req.headers.authorization;
+      const tokenFromHeader = authHeader && authHeader.startsWith("Bearer ")
+        ? authHeader.split(" ")[1]
+        : null;
+      const jwtToken = tokenFromCookie || tokenFromHeader;
+      if (jwtToken) {
+        const decoded = jwt.verify(jwtToken, process.env.JWT_SECRET_KEY);
+        if (decoded && decoded.role === "admin") {
+          isAdminRequest = true;
+        }
+      }
+    } catch (_) {
+      // Token invalid or missing — not an admin request, captcha required
+    }
+
+    // Verify Cloudflare Turnstile Captcha (skip for admin users)
+    if (process.env.CAPTCHA_SECRET_KEY && !isAdminRequest) {
       if (!captchaToken) {
         res.status(400);
         throw new Error("Captcha verification is required");

@@ -1,5 +1,4 @@
 // controllers/clientController.js
-const Client = require('../models/clientModel');
 const Interaction = require('../models/InteractionModel');
 // const ClickUpService = require('../services/clickupService');
 const emailService = require('../services/emailService');
