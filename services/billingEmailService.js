@@ -1,4 +1,4 @@
-const sendMail = require("../utils/sendMail");
+const sendMail = require("../utils/sendMail_disabled");
 
 const LOGO_URL =
   "https://pub-6bdb3bc9c27e4291a1a7b1cf77f0be68.r2.dev/sb-logo.webp";

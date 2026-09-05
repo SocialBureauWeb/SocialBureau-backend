@@ -1,6 +1,6 @@
 const Subscriber = require("../models/Subscriber");
 
-const sendMail = require("../utils/sendMail");
+const sendMail = require("../utils/sendMail_disabled");
 const blogJobTemplate = require("../utils/blogEmailTemplate");
 
 const { getLatestPublishedBlog, getLatestActiveJob } = require("../services/blogService");

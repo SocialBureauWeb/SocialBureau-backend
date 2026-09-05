@@ -1,5 +1,5 @@
 // services/emailService.js
-const { transporter } = require('../utils/sendMail');
+const { transporter } = require('../utils/sendMail_disabled');
 
 // Verify connection configuration (Optional, already handled in utils/sendMail.js)
 // transporter.verify((error, success) => {

@@ -1,6 +1,6 @@
 const cron = require("node-cron");
 const Meeting = require("../models/meetingModel");
-const sendMail = require("../utils/sendMail");
+const sendMail = require("../utils/sendMail_disabled");
 const googleService = require("../services/googleService");
 
 // Run every minute to check for upcoming meetings

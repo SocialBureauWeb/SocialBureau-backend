@@ -1,6 +1,6 @@
 require("dotenv").config();
 const googleService = require("../services/googleService");
-const sendMail = require("../utils/sendMail");
+const sendMail = require("../utils/sendMail_disabled");
 
 async function sendTestMeeting() {
   const testEmail = process.argv[2] || "admin@socialbureau.in";

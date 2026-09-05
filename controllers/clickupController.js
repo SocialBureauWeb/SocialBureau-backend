@@ -1920,7 +1920,7 @@ const clickupController = {
               const entryDay = entryDate.getUTCDate();
 
               if (entryYear === selectedYear && entryMonth === selectedMonth && entryDay === d) {
-                const hrs = (Number(entry.duration) || 0) / 3600000;
+                const hrs = (Number(entry.duration) || 0) / 36000000;
                 dailyHours += hrs;
                 console.log(`[Attendance Debug Public] Match found for ${slug} on Day ${d}: entry.start=${entry.start} (${entryDate.toUTCString()}), duration=${hrs}h`);
               }
