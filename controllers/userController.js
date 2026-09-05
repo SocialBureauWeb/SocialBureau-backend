@@ -134,18 +134,8 @@ const userController = {
     if (email) {
       const emailNormalized = email.toLowerCase().trim();
       
-      // Verification Guard for Gmail and Partner signups
-      const isGmail = emailNormalized.includes("gmail.com");
-      const isPartner = role === "partner" || role === "partnership";
-      if (isGmail || isPartner) {
-        const isVerified = await getVerificationCode(`signup_verified:${emailNormalized}`);
-        if (!isVerified || isVerified !== "true") {
-          res.status(400);
-          throw new Error("Email verification is required for registration");
-        }
-        // Remove verification flag
-        await removeVerificationCode(`signup_verified:${emailNormalized}`);
-      }
+      // NOTE: Removed OTP/email verification requirement for registration
+      // (previously enforced for Gmail and partner signups).
 
       const emailExists = await User.findOne({
         email: emailNormalized,
