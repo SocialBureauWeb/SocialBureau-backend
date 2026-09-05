@@ -155,3 +155,60 @@ exports.verifyPayment = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+/**
+ * @desc    Check if the logged-in user has already paid to unlock a gated page
+ * @route   GET /api/payment/page-access/:pageSlug
+ * @access  Private
+ */
+exports.checkPageAccess = async (req, res) => {
+  try {
+    const { pageSlug } = req.params;
+    if (!pageSlug) {
+      return res.status(400).json({ success: false, message: "pageSlug is required" });
+    }
+
+    const user = await User.findById(req.user.id).select("paidPages");
+    const hasAccess = !!user && Array.isArray(user.paidPages) && user.paidPages.includes(pageSlug);
+
+    return res.status(200).json({ success: true, hasAccess });
+  } catch (error) {
+    console.error("Page Access Check Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * @desc    Verify Razorpay payment for a gated page and persist access for the logged-in user
+ * @route   POST /api/payment/verify-page
+ * @access  Private
+ */
+exports.verifyPagePayment = async (req, res) => {
+  try {
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature, pageSlug } = req.body;
+
+    if (!pageSlug) {
+      return res.status(400).json({ success: false, message: "pageSlug is required" });
+    }
+
+    const sign = razorpay_order_id + "|" + razorpay_payment_id;
+    const expectedSign = crypto
+      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(sign.toString())
+      .digest("hex");
+
+    if (razorpay_signature !== expectedSign) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid signature, payment verification failed",
+      });
+    }
+
+    await User.findByIdAndUpdate(req.user.id, { $addToSet: { paidPages: pageSlug } });
+
+    return res.status(200).json({ success: true, message: "Payment verified, page unlocked" });
+  } catch (error) {
+    console.error("Page Payment Verification Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

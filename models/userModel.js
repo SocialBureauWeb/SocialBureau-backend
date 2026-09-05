@@ -166,6 +166,11 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    // slugs of one-time-paid gated pages, persists access across future logins
+    paidPages: {
+      type: [String],
+      default: [],
+    },
     hobbies: [String],
     education: [
       {
