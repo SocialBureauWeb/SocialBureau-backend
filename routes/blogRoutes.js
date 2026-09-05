@@ -34,6 +34,9 @@ blogRoutes.get('/stats', blogController.getStats);
 // Get latest blogs
 blogRoutes.get('/latest', blogController.getLatestBlogs);
 
+// Redirect lookup for old slugs
+blogRoutes.get('/redirect/:slug', blogController.getBlogRedirect);
+
 // Get all blogs (with filtering)
 blogRoutes.get('/', blogController.getBlogs);
 

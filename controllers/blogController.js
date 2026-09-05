@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const Blog = require('../models/blogModel');
+const BlogRedirect = require('../models/BlogRedirect');
 const generateSitemaps = require('../scripts/generateSitemaps');
 const expressAsyncHandler = require('express-async-handler');
 const {
@@ -205,17 +206,53 @@ const blogController = {
     }
   }),
 
+  getBlogRedirect: expressAsyncHandler(async (req, res) => {
+    try {
+      const { slug } = req.params;
+      const normalizedSlug = String(slug || '').trim().replace(/^\//, '').toLowerCase();
+
+      if (!normalizedSlug) {
+        return sendError(res, 400, 'Invalid slug');
+      }
+
+      const redirect = await BlogRedirect.findOne({
+        active: true,
+        $or: [
+          { sourceSlug: normalizedSlug },
+          { sourcePath: normalizedSlug },
+        ],
+      }).lean();
+
+      if (!redirect) {
+        return res.status(404).json({ success: false, message: 'Redirect not found' });
+      }
+
+      return res.json({
+        success: true,
+        data: {
+          sourceSlug: redirect.sourceSlug,
+          targetSlug: redirect.targetSlug,
+          targetPath: redirect.targetPath || `/blogs/${redirect.targetSlug}`,
+        },
+      });
+    } catch (err) {
+      console.error('❌ getBlogRedirect error:', err);
+      return sendError(res, 500, 'Internal server error', err.message);
+    }
+  }),
+
   // Get single blog by slug
   getBlogBySlug: expressAsyncHandler(async (req, res) => {
     try {
       const { slug } = req.params;
-      console.log('📖 getBlogBySlug called for slug:', slug);
+      const normalizedSlug = String(slug || '').trim().replace(/^\//, '').toLowerCase();
+      console.log('📖 getBlogBySlug called for slug:', normalizedSlug);
 
       // Increment view count safely (skip if DB not ready)
       try {
         if (mongoose.connection.readyState === 1) { // 1 = connected
           // don't await so that even if it fails we still return the blog quickly
-          Blog.findOneAndUpdate({ slug }, { $inc: { 'meta.views': 1 } }).catch(err => console.warn('view increment failed:', err.message));
+          Blog.findOneAndUpdate({ slug: normalizedSlug }, { $inc: { 'meta.views': 1 } }).catch(err => console.warn('view increment failed:', err.message));
         } else {
           console.warn('Skipping view increment - mongoose not connected (readyState=' + mongoose.connection.readyState + ')');
         }
@@ -223,28 +260,39 @@ const blogController = {
         console.warn('view increment error:', err && err.message ? err.message : err);
       }
 
-      console.log('🔍 Querying blog with slug:', slug);
-
-      // Redis caching
-      const cacheKey = `blog:${slug}`;
+      const cacheKey = `blog:${normalizedSlug}`;
       const cachedData = await getCache(cacheKey);
       if (cachedData) {
         console.log('⚡ Redis Cache Hit: getBlogBySlug');
         return res.json({ success: true, data: cachedData });
       }
 
-      const blog = await Blog.findOne({ slug })
+      let blog = await Blog.findOne({ slug: normalizedSlug })
         .populate('childBlogs', 'title slug excerpt image category')
         .lean();
 
       if (!blog) {
-        console.log('❌ Blog not found for slug:', slug);
+        const redirect = await BlogRedirect.findOne({
+          active: true,
+          $or: [
+            { sourceSlug: normalizedSlug },
+            { sourcePath: normalizedSlug },
+          ],
+        }).lean();
+
+        if (redirect) {
+          return res.status(301).json({
+            success: false,
+            redirectTo: `/blogs/${redirect.targetSlug}`,
+            message: 'Blog moved permanently',
+          });
+        }
+
+        console.log('❌ Blog not found for slug:', normalizedSlug);
         return sendError(res, 404, 'Blog not found');
       }
 
       console.log('✅ Blog found:', blog.title);
-
-      // Cache the result
       await setCache(cacheKey, blog, CACHE_EXPIRY.SINGLE_BLOG);
 
       return res.json({ success: true, data: blog });
@@ -409,6 +457,23 @@ const blogController = {
         new: true,
       }).lean();
 
+      if (updated && updated.slug && updated.slug !== oldSlug) {
+        const sourceSlug = String(oldSlug || '').trim().replace(/^\//, '').toLowerCase();
+        const targetSlug = String(updated.slug || '').trim().replace(/^\//, '').toLowerCase();
+
+        await BlogRedirect.findOneAndUpdate(
+          { sourceSlug },
+          {
+            sourceSlug,
+            targetSlug,
+            sourcePath: `/blogs/${sourceSlug}`,
+            targetPath: `/blogs/${targetSlug}`,
+            active: true,
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+      }
+
       // Invalidate cache
       await invalidateBlogCaches();
       await invalidateCache(`blog:${oldSlug}`);
@@ -454,6 +519,15 @@ const blogController = {
       }
 
       const removed = await Blog.findOneAndDelete({ slug }).lean();
+
+      if (removed) {
+        await BlogRedirect.deleteMany({
+          $or: [
+            { sourceSlug: slug },
+            { targetSlug: slug },
+          ],
+        });
+      }
 
       // Invalidate cache
       await invalidateBlogCaches();
